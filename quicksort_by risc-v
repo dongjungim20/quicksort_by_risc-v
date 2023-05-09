@@ -1,0 +1,246 @@
+addi x12, x11, -1 # end = size - 1
+addi x11, x0, 0 # start index
+# addi x12, x0, 99 # end
+# x10 : base address & x11 : size of array .. function argument
+
+QUICK_SORT:
+addi x2, x2, -48    # make 5 room
+sd x8, 40(x2)
+sd x1, 32(x2)   # previous sp
+sd x20, 24(x2)  # pivot idx
+sd x19, 16(x2)  # end idx
+sd x18, 8(x2)   # start idx
+sd x9, 0(x2)    # base addr
+
+addi x9, x10, 0             # x9 : base addr of array
+addi x18, x11, 0            # x18 = x11 = start idx
+addi x19, x12, 0            # x19 = x12 = end idx
+
+# ####################	if (end - start <= 0) return;
+# blt x12, x11, INSERTION_SORT  # x12(end) <= x11(start) -->> 역전 -->> smallest segment
+# beq x12, x11, INSERTION_SORT
+sub x16, x19, x18 # x16 = end - start
+addi x16, x16, -7 # x16 = end - start - 7
+blt x16, x0, INSERTION_SORT
+
+jal x1, REARRANGE
+
+addi x20, x10, 0   # x20 = pivot location(제외할것) ##############################
+
+addi x10, x9, 0    # put addr of array again!
+addi x11, x18, 0   # start index
+addi x12, x20, -1  # new end index
+jal x1, QUICK_SORT  # QUICK_SORT(arr, start, pi - 1);
+
+addi x10, x9, 0    # put addr of array again!
+addi x11, x20, 1   # new start index
+addi x12, x19, 0   # end index
+jal x1, QUICK_SORT  # QUICK_SORT(arr, pi + 1, end);
+
+# beq x1, x0, DONE
+# jalr x0, 0(x1)
+
+
+INSERTION_SORT:      # when subarray is shirink to smallest size >>  여기에 나중에 insertion sort 넣으면 됨
+
+slli x17, x18, 3 # 8*start
+add x10, x9, x17 # base addr + 8*start
+sub x11, x19, x18
+addi x11, x11, 1 # size = end - start + 1
+######### 잘 안됨. 아예 function을 만들고 saved reg로만 코딩해야하나?
+# initialization 
+# x28 : i
+# x10 : base addr (2000)
+# x11 : element number (20) : size
+addi x28, x0, 1        
+for1:
+  beq x28, x11, exit1  # sorting terminate
+  slli x29, x28, 3      
+  add x29, x29, x10     # x29 = base + 8i
+  ld x5, 0(x29)        # element = array[i]
+  addi x6, x28, 0      # j = i 
+for2:
+  slli x7, x6, 3     
+  add x7, x7, x10     # x7 = base + 8j
+  beq x6, x0, exit2   # j > 0
+  ld x30, -8(x7) 
+  blt x30, x5, exit2   # array[j-1] > element       
+  sd x30, 0(x7)        # swap
+  addi x6, x6, -1     
+  beq x0, x0, for2    # unconditional jump to for2, start for next j
+exit2:
+  addi x28, x28, 1      
+  sd x5, 0(x7)        # put element in ascending order position
+  beq x0, x0, for1    # unconditional jump to for1, start for next i
+exit1:
+
+
+ld x9, 0(x2) # restore saved register
+ld x18, 8(x2)
+ld x19, 16(x2)
+ld x20, 24(x2)
+ld x1, 32(x2)
+ld x8, 40(x2)
+addi x2, x2, 48
+jalr x0, 0(x1)
+
+
+REARRANGE: # base addr(x9), start idx(x18), end idx(x19) 받음
+# 이 아래부터는 caller의 saved reg을 읽어도 되지만 쓰면 안됨. 
+addi x2, x2, -8
+sd x1, 0(x2)    # back up return addr to QUICK_SORT
+
+
+#####################정렬###################
+slli x5, x19, 3   # end(x19) * 8
+add x5, x5, x9   # x5 = addr of end
+ld x29, 0(x5)     # arr[end] 
+
+slli x6, x18, 3   # end(x19) * 8
+add x6, x6, x9   # x6 = addr of start
+ld x30, 0(x6)     # arr[start] 
+
+sub x7, x19, x18
+addi x7, x7, 1
+srli x7, x7, 1
+add x7, x18, x7 # x7 = (mididx) = start idx + (endidx - startidx)/2
+slli x28, x7, 3
+add x28, x28, x9 # x28 = arr of mid
+ld x31, 0(x28)  # arr[mid]
+
+bge x31, x30, L1
+
+    sd x31, 0(x6) # arr[mid] >> arr[start]
+    sd x30, 0(x28) # arr[start] >> arr[mid]
+L1:
+
+slli x5, x19, 3   # end(x19) * 8
+add x5, x5, x9   # x5 = addr of end
+ld x29, 0(x5)     # arr[end] 
+slli x6, x18, 3   # end(x19) * 8
+add x6, x6, x9   # x6 = addr of start
+ld x30, 0(x6)     # arr[start] 
+
+bge x29, x30, L2
+    sd x29, 0(x6) # arr[end] > arr[start]
+    sd x30, 0(x5) # arr[start] > arr[end]
+L2:
+
+slli x28, x7, 3
+add x28, x28, x9 # x28 = arr of mid
+ld x31, 0(x28)  # arr[mid]
+slli x5, x19, 3   # end(x19) * 8
+add x5, x5, x9   # x5 = addr of end
+ld x29, 0(x5)     # arr[end] 
+
+bge x29, x31, L3
+    sd x29, 0(x28) # arr[end] >> arr[mid]
+    sd x31, 0(x5) # arr[mid] >> arr[end]
+L3:
+
+# 피봇 자리바꿈
+# arr[mid] <-> arr[end-1]
+slli x28, x7, 3
+add x28, x28, x9 # x28 = arr of mid
+ld x31, 0(x28)  # arr[mid]
+slli x5, x19, 3   # end(x19) * 8
+add x5, x5, x9   # x5 = addr of end
+ld x29, -8(x5)     # arr[end-1] 
+
+sd x29, 0(x28)
+sd x31, -8(x5)
+
+#################################################
+# i, j, pivot initialization
+# x18 : start idx, x19: end idx, x7: mid idx
+addi x15, x19, -1 # pivot idx
+slli x7, x15, 3 # pivot addr
+add x7, x7, x9
+ld x30, 0(x7) # pivot value
+
+addi x14, x15, -1 # j = pivot idx - 1
+slli x6, x14, 3
+add x6, x6, x9
+ld x29, 0(x6) # arr[j]
+
+addi x13, x18, 1 # i
+slli x5, x13, 3
+add x5, x5, x9
+ld x28, 0(x5) # arr[i]
+
+#####################loop########################
+LOOP: # while loop 
+blt x14, x13, LOOP_TERMINATE # x14: j, x13: i
+
+LOOP1: # i에 대하여, 우측으로 이동하다가 pivot value보다 큰것 만나면 정지
+slli x7, x15, 3 # pivot addr
+add x7, x7, x9
+ld x30, 0(x7) # pivot value
+slli x5, x13, 3
+add x5, x5, x9
+ld x28, 0(x5) # arr[i]
+
+bge x28, x30, LX1
+    addi x13, x13, 1
+    slli x5, x13, 3
+    add x5, x5, x9
+    ld x28, 0(x5) # arr[i] 
+beq x0, x0, LOOP1   
+LX1:
+
+LOOP2:
+slli x7, x15, 3 # pivot addr
+add x7, x7, x9
+ld x30, 0(x7) # pivot value
+slli x6, x14, 3
+add x6, x6, x9
+ld x29, 0(x6) # arr[j]
+bge x30, x29, LX2
+    addi x14, x14, -1
+    slli x6, x14, 3
+    add x6, x6, x9
+    ld x29, 0(x6) # arr[j]
+beq x0, x0, LOOP2
+LX2:
+
+bge x13, x14, LOOP_TERMINATE # x13 : i, x14 : j
+
+# swap arr[i] and arr[j]
+slli x5, x13, 3
+add x5, x5, x9
+ld x28, 0(x5) # arr[i]
+slli x6, x14, 3
+add x6, x6, x9
+ld x29, 0(x6) # arr[j]
+
+sd x28, 0(x6) # arr[i] >> arr[j]
+sd x29, 0(x5) # arr[j] >> arr[i]
+
+
+beq x0, x0, LOOP
+LOOP_TERMINATE: # loop end. EXCUTE SWAP
+
+
+############# swap하고, 가운데 i(얘빼고 할거)를 x10에 넘겨주면 됨. 
+slli x7, x15, 3 # pivot addr
+add x7, x7, x9
+ld x30, 0(x7) # pivot value
+slli x5, x13, 3
+add x5, x5, x9
+ld x28, 0(x5) # arr[i]
+
+sd x28, 0(x7) # arr[i] >> arr[pivot]
+sd x30, 0(x5) # arr[pivot] >> arr[i]
+
+addi x10, x13, 0   # return i >>>> this maybe the pivot location
+
+######### return to caller(QUICK_SORT func frame)
+ld x1, 0(x2)
+addi x2, x2, 8
+jalr x0, 0(x1) # back to caller(pivot function)
+
+
+######### QUICK_SORT function done
+
+
+DONE: 
